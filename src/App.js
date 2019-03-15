@@ -26,6 +26,7 @@ class Stream extends React.Component {
   componentDidMount() {
     let stream = this.props.stream
     if (!stream) return
+    console.log(`playing stream ${this.uid}`)
     stream.play(`${this.uid}`)
     // this.props.mount(stream)
     this.clearDefaultStyles()
@@ -34,6 +35,7 @@ class Stream extends React.Component {
   componentWillUnmount() {
     let stream = this.props.stream
     if (!stream) return
+    console.log(`stopping stream ${this.uid}`)
     stream.stop()
     // this.props.unmount(stream)
   }
@@ -61,6 +63,7 @@ class App extends React.Component {
   initClient = () => {
     const appid = this.appid
     this.AgoraRTC = AgoraRTC
+    this.AgoraRTC.Logger.setLogLevel(this.AgoraRTC.Logger.ERROR)
     const client = this.AgoraRTC.createClient({mode: "live", codec: "h264"})
     return new Promise((resolve, reject) => {
       client.init(appid, () => resolve(client))
@@ -170,6 +173,7 @@ class App extends React.Component {
     this.client.leave()
   }
 
+  // only call stream.play() if not already playing
   streamMount = (stream) => {
     let id = stream.streamId
     if (!this.state.playing.includes(id)) {
@@ -178,6 +182,7 @@ class App extends React.Component {
     }
   }
 
+  // only call stream.stop() if stream has been removed from streamList
   streamUnmount = (stream) => {
     let id = stream.streamId
     let exists = this.state.streamList.some(item => {
