@@ -2,11 +2,18 @@ import React from 'react'
 import AgoraRTC from 'agora-rtc-sdk'
 import styles from './styles.module.css'
 
+import volume from './assets/volume-high.png'
+import volumeOff from './assets/volume-off.png'
+
 class Stream extends React.Component {
 
   constructor(props) {
     super(props)
     this.uid = this.props.stream && this.props.stream.streamId
+    this.state = {
+      muted: false,
+      volume: 0,
+    }
   }
 
   clearDefaultStyles = () => {
@@ -19,6 +26,27 @@ class Stream extends React.Component {
     player.style = ''
   }
 
+  getAudioLevel = () => {
+    this.volumeInterval = setInterval(() => {
+      let stream = this.props.stream
+      if (!stream) return
+      let volume = stream.getAudioLevel()
+      this.setState({volume})
+    }, 100)
+  }
+
+  disableSound = (e) => {
+    e.stopPropagation()
+    this.setState({muted: true})
+    this.props.stream && this.props.stream.disableAudio()
+  }
+
+  enableSound = (e) => {
+    e.stopPropagation()
+    this.setState({muted: false})
+    this.props.stream && this.props.stream.enableAudio()
+  }
+
   handleClick = () => {
     this.props.click && this.props.click(this.uid)
   }
@@ -26,23 +54,35 @@ class Stream extends React.Component {
   componentDidMount() {
     let stream = this.props.stream
     if (!stream) return
-    console.log(`playing stream ${this.uid}`)
-    stream.play(`${this.uid}`)
-    // this.props.mount(stream)
+    this.props.mount(stream)
     this.clearDefaultStyles()
+    this.getAudioLevel()
   }
 
   componentWillUnmount() {
+    this.volumeInterval && clearInterval(this.volumeInterval)
     let stream = this.props.stream
     if (!stream) return
-    console.log(`stopping stream ${this.uid}`)
-    stream.stop()
-    // this.props.unmount(stream)
+    this.props.unmount(stream)
   }
 
   render() {
     return (
-      <section id={this.uid} className={styles.stream} onClick={this.handleClick}/>
+      <div>
+        <section id={this.uid} className={styles.stream} onClick={this.handleClick}>
+          <div className={styles.volume}>
+            <div className={styles.volumeMeter}>
+              <div className={styles.volumeBar} style={{height: (this.state.volume * 100) + '%'}}></div>
+            </div>
+            <button
+              className={styles.muteButton}
+              onClick={this.state.muted ? this.enableSound : this.disableSound}
+            >
+              <img src={this.state.muted ? volumeOff : volume} className={styles.icon}/>
+            </button>
+          </div>
+        </section>
+      </div>
     )
   }
 }
@@ -61,7 +101,7 @@ class App extends React.Component {
   }
 
   initClient = () => {
-    const appid = this.appid
+    const appid = "4a13170d702a497e8394d2c17618acf4"
     this.AgoraRTC = AgoraRTC
     this.AgoraRTC.Logger.setLogLevel(this.AgoraRTC.Logger.ERROR)
     const client = this.AgoraRTC.createClient({mode: "live", codec: "h264"})
@@ -130,7 +170,7 @@ class App extends React.Component {
     if (repeat) return
     let main = !this.state.mainStream ? {mainStream: id} : {}
     this.setState({
-      streamList: [stream, ...this.state.streamList],
+      streamList: [...this.state.streamList, stream],
       ...main
     })
   }
@@ -173,8 +213,7 @@ class App extends React.Component {
     this.client.leave()
   }
 
-  // only call stream.play() if not already playing
-  streamMount = (stream) => {
+  mount = (stream) => {
     let id = stream.streamId
     if (!this.state.playing.includes(id)) {
       stream.play(`${id}`)
@@ -182,8 +221,7 @@ class App extends React.Component {
     }
   }
 
-  // only call stream.stop() if stream has been removed from streamList
-  streamUnmount = (stream) => {
+  unmount = (stream) => {
     let id = stream.streamId
     let exists = this.state.streamList.some(item => {
       return item.streamId === id
@@ -192,8 +230,22 @@ class App extends React.Component {
     stream.stop()
   }
 
+  componentDidUpdate(prevProps, prevState) {
+    if (this.state.mainStream !== prevState.mainStream
+    || this.state.streamList !== prevState.streamList) {
+      let thumbs = document.getElementById('ag-thumbs')
+      let main = document.getElementById('ag-main')
+      this.state.streamList.forEach((stream) => {
+        let id = stream.streamId
+        let div = document.getElementById(`${id}`)
+        let mainStream = this.state.mainStream
+        let parent = id === mainStream ? main : thumbs
+        parent.appendChild(div)
+      })
+    }
+  }
+
   componentWillMount() {
-    this.appid = prompt("enter agora appid:")
     this.start()
   }
 
@@ -202,37 +254,22 @@ class App extends React.Component {
   }
 
   render() {
-    let { streamList, mainStream } = this.state
+    let { streamList } = this.state
     return (
       <div className={styles.root}>
-        <div className={styles.thumbs}>
-          {streamList.map((stream) => {
-            if (stream.streamId !== mainStream) {
-              return (
-                <Stream
-                  stream={stream}
-                  key={stream.streamId}
-                  mount={this.streamMount}
-                  unmount={this.streamUnmount}
-                  click={this.selectMain}
-                />
-              )
-            }
-          })}
-        </div>
-        <div className={styles.main}>
-          {streamList.map((stream) => {
-            if (stream.streamId === mainStream) {
-              return (
-                <Stream
-                  stream={stream}
-                  key={stream.streamId}
-                  mount={this.streamMount}
-                  unmount={this.streamUnmount}
-                />
-              )
-            }
-          })}
+        <div className={styles.grid} id="ag-grid"/>
+        <div className={styles.thumbs} id="ag-thumbs"/>
+        <div className={styles.main} id="ag-main"/>
+        <div className={styles.hidden} id="ag-hidden">
+          {streamList.map((stream) =>
+            <Stream
+              stream={stream}
+              key={stream.streamId}
+              click={this.selectMain}
+              mount={this.mount}
+              unmount={this.unmount}
+            />
+          )}
         </div>
       </div>
     )
