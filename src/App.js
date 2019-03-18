@@ -101,7 +101,7 @@ class App extends React.Component {
   }
 
   initClient = () => {
-    const appid = "4a13170d702a497e8394d2c17618acf4"
+    const appid = this.appid
     this.AgoraRTC = AgoraRTC
     this.AgoraRTC.Logger.setLogLevel(this.AgoraRTC.Logger.ERROR)
     const client = this.AgoraRTC.createClient({mode: "live", codec: "h264"})
@@ -246,6 +246,7 @@ class App extends React.Component {
   }
 
   componentWillMount() {
+    this.appid = prompt('enter agora app id:')
     this.start()
   }
 
